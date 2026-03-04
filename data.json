@@ -1,0 +1,169 @@
+{
+  "updated": "2026-03-04",
+  "services": [
+    "Netflix",
+    "Amazon Prime Video",
+    "Disney+",
+    "Hulu",
+    "U-NEXT",
+    "Apple TV",
+    "ABEMA",
+    "WOWOW",
+    "FOD",
+    "dTV"
+  ],
+  "addon_channels": [
+    "HBO Max (U-NEXT+fee)",
+    "Apple TV (Amazon+fee)",
+    "KADOKAWA ch (Amazon+fee)"
+  ],
+  "movies": [
+    {
+      "broadcast_date": "2026-03-07",
+      "broadcast_time": "21:00",
+      "program_name": "シネマ4K",
+      "title": "ワンス・アポン・ア・タイム・イン・ハリウッド",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": true,
+        "Disney+": false,
+        "Hulu": true,
+        "U-NEXT": true,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": false
+      }
+    },
+    {
+      "broadcast_date": "2026-03-16",
+      "broadcast_time": "09:30",
+      "program_name": "シネマ4K",
+      "title": "雨月物語 4Kデジタル修復版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": true,
+        "Disney+": false,
+        "Hulu": false,
+        "U-NEXT": false,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": true
+      }
+    },
+    {
+      "broadcast_date": "2026-03-17",
+      "broadcast_time": "09:30",
+      "program_name": "シネマ4K",
+      "title": "山椒大夫 4Kデジタル修復版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": false,
+        "Disney+": false,
+        "Hulu": false,
+        "U-NEXT": false,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": true
+      }
+    },
+    {
+      "broadcast_date": "2026-03-18",
+      "broadcast_time": "09:30",
+      "program_name": "シネマ4K",
+      "title": "近松物語 4Kデジタル修復版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": true,
+        "Disney+": false,
+        "Hulu": false,
+        "U-NEXT": false,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": false
+      }
+    },
+    {
+      "broadcast_date": "2026-03-19",
+      "broadcast_time": "09:30",
+      "program_name": "シネマ4K",
+      "title": "浮草 4Kデジタル修復版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": false,
+        "Disney+": false,
+        "Hulu": true,
+        "U-NEXT": true,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": false
+      }
+    },
+    {
+      "broadcast_date": "2026-03-20",
+      "broadcast_time": "09:30",
+      "program_name": "シネマ4K",
+      "title": "復活の日 4Kデジタル修復版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": false,
+        "Disney+": false,
+        "Hulu": false,
+        "U-NEXT": false,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": false,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": false
+      }
+    },
+    {
+      "broadcast_date": "2026-03-28",
+      "broadcast_time": "21:00",
+      "program_name": "シネマ4K",
+      "title": "オズの魔法使 4K版",
+      "streaming": {
+        "Netflix": false,
+        "Amazon Prime Video": true,
+        "Disney+": false,
+        "Hulu": false,
+        "U-NEXT": false,
+        "Apple TV": false,
+        "ABEMA": false,
+        "WOWOW": false,
+        "FOD": false,
+        "dTV": false,
+        "HBO Max (U-NEXT+fee)": true,
+        "Apple TV (Amazon+fee)": false,
+        "KADOKAWA ch (Amazon+fee)": false
+      }
+    }
+  ]
+}
