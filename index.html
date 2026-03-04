@@ -184,7 +184,7 @@
       <div style="display:flex;gap:1.25rem;flex-wrap:wrap">
         <label>
           <input type="checkbox" id="filter-available" checked>
-          選択サービスで観られる映画のみ表示
+          選択サービスで観られない映画のみ表示
         </label>
         <label>
           <input type="checkbox" id="show-past">
@@ -285,10 +285,11 @@
       const matched   = allAvail.filter(k => selected.has(k));
       const hasMatch  = matched.length > 0;
 
-      // Decide visibility / dim
-      const hide = hasFilter && filterOn && !hasMatch;
+      // Decide visibility / dim — hide/dim movies that ARE on the user's services
+      // (those can be watched on streaming anytime; BSP4K-exclusive ones are the priority)
+      const hide = hasFilter && filterOn && hasMatch;
       if (hide) return;
-      const dim  = hasFilter && !filterOn && !hasMatch;
+      const dim  = hasFilter && !filterOn && hasMatch;
 
       visible++;
 
@@ -316,7 +317,7 @@
 
     const stats = document.getElementById('stats');
     stats.textContent = (hasFilter && filterOn)
-      ? `${visible} 件 / ${total} 件表示中`
+      ? `配信なし: ${visible} 件 / 全 ${total} 件`
       : `${total} 件`;
   }
 
