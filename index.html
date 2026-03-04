@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NHK BSP4K 映画 × 配信チェッカー</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #dde1e7;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-bg: #dbeafe;
+      --green: #16a34a;
+      --green-bg: #dcfce7;
+      --dim: #9ca3af;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP",
+                   "Yu Gothic UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+    header .updated { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── Layout ── */
+    .container { max-width: 1060px; margin: 0 auto; padding: 1.25rem 1rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.7rem;
+    }
+
+    /* ── Service toggles ── */
+    .toggle-group { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .toggle-group + .toggle-group { margin-top: 0.6rem; }
+
+    .svc-btn {
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s, color 0.12s;
+      user-select: none;
+    }
+    .svc-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .svc-btn.on {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .addon-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin: 0.55rem 0 0.4rem;
+    }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .filter-bar label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.88rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .filter-bar input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+    .stats { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th {
+      background: var(--bg);
+      border-bottom: 2px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f9fafb; }
+    tbody tr.dimmed { opacity: 0.3; }
+    td { padding: 0.6rem 0.75rem; vertical-align: middle; }
+
+    .col-date { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+    .col-time { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--muted); }
+    .col-prog { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+    .col-title { font-weight: 500; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .badge {
+      padding: 0.18rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge-match  { background: var(--green-bg);  color: var(--green); }
+    .badge-other  { background: #f3f4f6; color: var(--dim); }
+    .badge-none   { font-size: 0.78rem; color: var(--dim); }
+
+    .no-data {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      header { padding: 0.85rem 1rem; }
+      .col-prog { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>NHK BSP4K 映画 × 配信チェッカー</h1>
+  <span class="updated">更新日: <span id="updated">—</span></span>
+</header>
+
+<div class="container">
+
+  <!-- Service selection -->
+  <div class="card">
+    <div class="card-label">契約中のサービスを選択</div>
+    <div class="toggle-group" id="svc-standard"></div>
+    <div class="addon-label">アドオンチャンネル（別料金）</div>
+    <div class="toggle-group" id="svc-addon"></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card">
+    <div class="filter-bar">
+      <div style="display:flex;gap:1.25rem;flex-wrap:wrap">
+        <label>
+          <input type="checkbox" id="filter-available" checked>
+          選択サービスで観られる映画のみ表示
+        </label>
+        <label>
+          <input type="checkbox" id="show-past">
+          過去の放送も表示
+        </label>
+      </div>
+      <span class="stats" id="stats"></span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>放送日</th>
+            <th>時刻</th>
+            <th class="col-prog">番組</th>
+            <th>タイトル</th>
+            <th>配信サービス</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="5" class="no-data">読み込み中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  const STORAGE_KEY = 'nhk_bsp4k_v1';
+  const WEEKDAYS = ['日','月','火','水','木','金','土'];
+
+  let data = null;
+  let selected = new Set();
+
+  // ── Persistence ────────────────────────────────────────────────────────────
+  function loadPrefs() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) selected = new Set(JSON.parse(raw));
+    } catch {}
+  }
+  function savePrefs() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected]));
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function fmtDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    return `${m}/${d}(${WEEKDAYS[dow]})`;
+  }
+
+  function makeBtn(svc) {
+    const btn = document.createElement('button');
+    btn.className = 'svc-btn' + (selected.has(svc) ? ' on' : '');
+    btn.textContent = svc;
+    btn.dataset.svc = svc;
+    btn.addEventListener('click', () => {
+      if (selected.has(svc)) { selected.delete(svc); btn.classList.remove('on'); }
+      else                   { selected.add(svc);    btn.classList.add('on'); }
+      savePrefs();
+      render();
+    });
+    return btn;
+  }
+
+  // ── Render toggles ─────────────────────────────────────────────────────────
+  function renderToggles() {
+    const std   = document.getElementById('svc-standard');
+    const addon = document.getElementById('svc-addon');
+    data.services.forEach(s => std.appendChild(makeBtn(s)));
+    data.addon_channels.forEach(s => addon.appendChild(makeBtn(s)));
+  }
+
+  // ── Render table ───────────────────────────────────────────────────────────
+  function render() {
+    const filterOn  = document.getElementById('filter-available').checked;
+    const showPast  = document.getElementById('show-past').checked;
+    const today     = new Date().toISOString().slice(0, 10);
+    const tbody     = document.getElementById('tbody');
+    const hasFilter = selected.size > 0;
+
+    tbody.innerHTML = '';
+    let visible = 0, total = 0;
+
+    data.movies.forEach(m => {
+      if (!showPast && m.broadcast_date < today) return;
+      total++;
+
+      // Services that have this movie
+      const allAvail  = Object.keys(m.streaming).filter(k => m.streaming[k]);
+      // Intersection with user's selected services
+      const matched   = allAvail.filter(k => selected.has(k));
+      const hasMatch  = matched.length > 0;
+
+      // Decide visibility / dim
+      const hide = hasFilter && filterOn && !hasMatch;
+      if (hide) return;
+      const dim  = hasFilter && !filterOn && !hasMatch;
+
+      visible++;
+
+      const badgesHtml = allAvail.length === 0
+        ? '<span class="badge-none">—</span>'
+        : allAvail.map(s => {
+            const cls = selected.has(s) ? 'badge badge-match' : 'badge badge-other';
+            return `<span class="${cls}">${s}</span>`;
+          }).join('');
+
+      const tr = document.createElement('tr');
+      if (dim) tr.classList.add('dimmed');
+      tr.innerHTML = `
+        <td class="col-date">${fmtDate(m.broadcast_date)}</td>
+        <td class="col-time">${m.broadcast_time}</td>
+        <td class="col-prog">${m.program_name}</td>
+        <td class="col-title">${m.title}</td>
+        <td><div class="badges">${badgesHtml}</div></td>`;
+      tbody.appendChild(tr);
+    });
+
+    if (visible === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="no-data">該当する映画がありません</td></tr>';
+    }
+
+    const stats = document.getElementById('stats');
+    stats.textContent = (hasFilter && filterOn)
+      ? `${visible} 件 / ${total} 件表示中`
+      : `${total} 件`;
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  async function init() {
+    loadPrefs();
+    try {
+      const res = await fetch('data.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+    } catch (e) {
+      document.getElementById('tbody').innerHTML =
+        `<tr><td colspan="5" class="no-data">データの読み込みに失敗しました (${e.message})</td></tr>`;
+      return;
+    }
+
+    document.getElementById('updated').textContent = data.updated;
+    renderToggles();
+
+    document.getElementById('filter-available').addEventListener('change', render);
+    document.getElementById('show-past').addEventListener('change', render);
+
+    render();
+  }
+
+  init();
+</script>
+</body>
+</html>

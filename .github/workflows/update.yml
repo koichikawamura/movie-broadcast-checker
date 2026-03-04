@@ -1,0 +1,39 @@
+name: Update movie data
+
+on:
+  schedule:
+    # Every Monday at 05:00 JST (= Sunday 20:00 UTC)
+    - cron: '0 20 * * 0'
+  workflow_dispatch:  # allow manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium --with-deps
+
+      - name: Run scraper
+        run: uv run main.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nhk_bsp4k_movies.csv data.json
+          git diff --staged --quiet \
+            || git commit -m "chore: update movie data $(date -u +%Y-%m-%d)"
+          git push
