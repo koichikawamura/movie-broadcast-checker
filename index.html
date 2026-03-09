@@ -306,13 +306,17 @@
             return `<span class="${cls}">${s}</span>`;
           }).join('');
 
+      const titleHtml = m.page_url
+        ? `<a href="${m.page_url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">${m.title}</a>`
+        : m.title;
+
       const tr = document.createElement('tr');
       if (dim) tr.classList.add('dimmed');
       tr.innerHTML = `
         <td class="col-date">${fmtDate(m.broadcast_date)}</td>
         <td class="col-time">${m.broadcast_time}</td>
         <td class="col-prog">${m.program_name}</td>
-        <td class="col-title">${m.title}</td>
+        <td class="col-title">${titleHtml}</td>
         <td><div class="badges">${badgesHtml}</div></td>`;
       tbody.appendChild(tr);
     });

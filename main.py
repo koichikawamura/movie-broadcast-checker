@@ -85,6 +85,7 @@ class Movie:
     broadcast_time: str
     program_name: str   # e.g. "シネマ4K" or "プレミアムシネマ4K"
     title: str
+    page_url: str = ""
     streaming: dict[str, bool] = field(default_factory=dict)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -144,16 +145,46 @@ async def scrape_blog_calendar(page: Page, url: str, year: int) -> list[Movie]:
     await _goto_with_retry(page, url, timeout=30_000)
     await page.wait_for_timeout(1_500)
     body = await page.inner_text("body")
-    return _parse_blog_text(body, year)
+
+    # Collect all anchor links from the post to map movie titles → program pages.
+    anchors: list[dict] = await page.evaluate(
+        """() => [...document.querySelectorAll("a[href]")]
+                .map(a => ({text: a.textContent.trim(), href: a.href}))
+                .filter(a => a.text && a.href.startsWith('http'))"""
+    )
+    link_map: dict[str, str] = {}
+    for a in anchors:
+        t = unicodedata.normalize("NFKC", a["text"]).strip()
+        if t:
+            link_map[t] = a["href"]
+
+    return _parse_blog_text(body, year, link_map=link_map, fallback_url=url)
 
 
-def _parse_blog_text(text: str, year: int) -> list[Movie]:
+def _find_url_for_title(title: str, link_map: dict[str, str]) -> str:
+    """Return the best URL for a movie title from an anchor link map."""
+    if title in link_map:
+        return link_map[title]
+    # Anchor text may include Japanese quotes: 「Title」
+    for text, href in link_map.items():
+        if title in text:
+            return href
+    return ""
+
+
+def _parse_blog_text(
+    text: str,
+    year: int,
+    link_map: dict[str, str] | None = None,
+    fallback_url: str = "",
+) -> list[Movie]:
     """Parse the flat text of a monthly calendar blog post.
 
     Entries look like:
         ■「ワンス・アポン・ア・タイム・イン・ハリウッド」
         NHK BSP4K 3月7日(土)午後9:00～
     """
+    link_map = link_map or {}
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     movies: list[Movie] = []
 
@@ -197,11 +228,13 @@ def _parse_blog_text(text: str, year: int) -> list[Movie]:
         except ValueError:
             continue
 
+        page_url = _find_url_for_title(title, link_map) or fallback_url
         movies.append(Movie(
             broadcast_date=bd.isoformat(),
             broadcast_time=broadcast_time,
             program_name=_infer_program_name(title),
             title=title,
+            page_url=page_url,
         ))
 
     return movies
@@ -264,6 +297,7 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
             broadcast_time=broadcast_time,
             program_name=program_name,
             title=title,
+            page_url=href,
         ))
 
     return movies
@@ -436,6 +470,7 @@ async def main() -> None:
                 "broadcast_time": m.broadcast_time,
                 "program_name": m.program_name,
                 "title": m.title,
+                "page_url": m.page_url,
                 "streaming": m.streaming,
             }
             for m in all_movies
