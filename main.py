@@ -210,6 +210,36 @@ def _parse_blog_text(text: str, year: int) -> list[Movie]:
 
 # ── Source 2: series /schedule page ────────────────────────────────────────────
 
+def _ep_link_to_title(raw_text: str) -> str:
+    """Extract a bare movie title from the text content of an /ep/ anchor."""
+    text = unicodedata.normalize("NFKC", raw_text).strip()
+    for prefix in ("シネマ4K", "プレミアムシネマ4K", "プレミアムシネマ", "シネマ"):
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+            break
+    m = re.search(r"「([^」]+)」", text)
+    return m.group(1).strip() if m else text.split("\n")[0].strip()
+
+
+async def _collect_ep_url_map(page: Page) -> dict[str, str]:
+    """Query all /ep/ links on the current page and return title → URL."""
+    raw: list[dict] = await page.evaluate(
+        """() => {
+            const seen = new Set();
+            return [...document.querySelectorAll('a[href*="/ep/"]')]
+                .filter(a => { if (seen.has(a.href)) return false; seen.add(a.href); return true; })
+                .map(a => ({ text: a.textContent.trim(), href: a.href }))
+                .filter(a => a.text);
+        }"""
+    )
+    ep_map: dict[str, str] = {}
+    for item in raw:
+        title = _ep_link_to_title(item["text"])
+        if title and title not in ep_map:
+            ep_map[title] = item["href"]
+    return ep_map
+
+
 async def scrape_series_schedule(page: Page) -> list[Movie]:
     """Scrape the series /schedule page for BSP4K items (href contains -s5-)."""
     await _goto_with_retry(page, NHK_SERIES_SCHEDULE_URL, timeout=25_000)
@@ -231,6 +261,9 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
         }}""",
         BSP4K_CHANNEL_CODE,
     )
+
+    # Collect /ep/ links from the same page to map titles → episode URLs.
+    ep_url_map = await _collect_ep_url_map(page)
 
     movies: list[Movie] = []
     for item in items:
@@ -266,6 +299,7 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
             broadcast_time=broadcast_time,
             program_name=program_name,
             title=title,
+            page_url=ep_url_map.get(title, ""),
         ))
 
     return movies
@@ -276,46 +310,7 @@ async def fetch_episode_url_map(page: Page) -> dict[str, str]:
     """Scrape the series main page for all /ep/ links and return title → URL."""
     await _goto_with_retry(page, NHK_SERIES_BASE_URL, timeout=30_000)
     await page.wait_for_timeout(1_500)
-
-    items: list[dict] = await page.evaluate(
-        """() => {
-            const seen = new Set();
-            return [...document.querySelectorAll("a[href*='/ep/']")]
-                .filter(a => {
-                    if (seen.has(a.href)) return false;
-                    seen.add(a.href);
-                    return true;
-                })
-                .map(a => {
-                    // Prefer a dedicated title child element over the full card text.
-                    const titleEl = a.querySelector(
-                        'h1,h2,h3,h4,[class*="title"],[class*="name"],[class*="ttl"]'
-                    );
-                    return {
-                        text: (titleEl || a).textContent.trim(),
-                        href: a.href
-                    };
-                })
-                .filter(item => item.text);
-        }"""
-    )
-
-    _PROG_PREFIXES = ("シネマ4K", "プレミアムシネマ4K", "プレミアムシネマ", "シネマ")
-
-    ep_map: dict[str, str] = {}
-    for item in items:
-        text = unicodedata.normalize("NFKC", item["text"]).strip()
-        # Strip program-name prefix (e.g. "プレミアムシネマ4K「Title」" → "「Title」")
-        for prefix in _PROG_PREFIXES:
-            if text.startswith(prefix):
-                text = text[len(prefix):].strip()
-                break
-        # Extract from 「...」 quotes; fall back to first non-empty line.
-        m = re.search(r"「([^」]+)」", text)
-        title = m.group(1).strip() if m else text.split("\n")[0].strip()
-        if title and title not in ep_map:
-            ep_map[title] = item["href"]
-    return ep_map
+    return await _collect_ep_url_map(page)
 
 
 # ── JustWatch ──────────────────────────────────────────────────────────────────
@@ -415,9 +410,18 @@ async def main() -> None:
     all_movies = sorted(merged.values(), key=lambda m: (m.broadcast_date, m.broadcast_time))
 
     # Fill in episode page URLs (prefer already-set /ep/ URLs from the schedule scraper).
+    linked = 0
     for m in all_movies:
         if not m.page_url and m.title in episode_url_map:
             m.page_url = episode_url_map[m.title]
+        if m.page_url:
+            linked += 1
+    print(f"  Episode URLs linked: {linked} / {len(all_movies)}")
+    if not any(m.page_url for m in all_movies):
+        sample_titles = [m.title for m in all_movies[:3]]
+        sample_ep    = list(episode_url_map.items())[:3]
+        print(f"  [debug] sample movie titles : {sample_titles}", file=sys.stderr)
+        print(f"  [debug] sample ep_map keys  : {[k for k,_ in sample_ep]}", file=sys.stderr)
 
     if not all_movies:
         print(
