@@ -250,12 +250,18 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
         f"""(code) => {{
             const results = [];
             document.querySelectorAll("li").forEach(li => {{
-                const a = li.querySelector("a[href]");
-                if (!a || !new RegExp("-" + code + "-").test(a.href)) return;
+                // The schedule link (contains -s5-) carries the broadcast date.
+                const scheduleA = [...li.querySelectorAll("a[href]")]
+                    .find(a => new RegExp("-" + code + "-").test(a.href));
+                if (!scheduleA) return;
+                // Prefer the episode detail link (/ep/) as the page URL.
+                const epA = [...li.querySelectorAll("a[href]")]
+                    .find(a => /\/ep\//.test(a.href));
                 const titleEl = li.querySelector(".program_title");
                 results.push({{
                     text: (titleEl || li).textContent.trim(),
-                    href: a.href
+                    schedule_href: scheduleA.href,
+                    page_url: epA ? epA.href : ""
                 }});
             }});
             return results;
@@ -266,7 +272,7 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
     movies: list[Movie] = []
     for item in items:
         text = item["text"]
-        href = item["href"]
+        href = item["schedule_href"]
 
         # Broadcast date from href: …-s5-130-YYYYMMDD/…
         date_m = re.search(r"-s5-\d+-(\d{8})", href)
@@ -297,7 +303,7 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
             broadcast_time=broadcast_time,
             program_name=program_name,
             title=title,
-            page_url=href,
+            page_url=item["page_url"],
         ))
 
     return movies
