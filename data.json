@@ -1,5 +1,5 @@
 {
-  "updated": "2026-03-04",
+  "updated": "2026-03-09",
   "services": [
     "Netflix",
     "Amazon Prime Video",
@@ -21,7 +21,7 @@
     {
       "broadcast_date": "2026-03-07",
       "broadcast_time": "21:00",
-      "program_name": "シネマ4K",
+      "program_name": "プレミアムシネマ4K",
       "title": "ワンス・アポン・ア・タイム・イン・ハリウッド",
       "streaming": {
         "Netflix": false,
@@ -154,7 +154,7 @@
         "Amazon Prime Video": true,
         "Disney+": false,
         "Hulu": false,
-        "U-NEXT": false,
+        "U-NEXT": true,
         "Apple TV": false,
         "ABEMA": false,
         "WOWOW": false,

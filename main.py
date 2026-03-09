@@ -107,9 +107,23 @@ def _infer_program_name(title: str) -> str:
 
 # ── Source 1: monthly blog calendar ────────────────────────────────────────────
 
+async def _goto_with_retry(page: Page, url: str, retries: int = 3, timeout: int = 30_000) -> None:
+    """Navigate to url, retrying on network errors with exponential back-off."""
+    for attempt in range(1, retries + 1):
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            return
+        except Exception as exc:
+            if attempt == retries:
+                raise
+            wait_sec = 2 ** attempt
+            print(f"  goto failed (attempt {attempt}/{retries}): {exc!r} — retrying in {wait_sec}s …", file=sys.stderr)
+            await asyncio.sleep(wait_sec)
+
+
 async def fetch_blog_calendar_urls(page: Page) -> list[tuple[str, int]]:
     """Scrape the blog index and return (post_url, year) for monthly calendar posts."""
-    await page.goto(NHK_BLOG_INDEX_URL, wait_until="domcontentloaded", timeout=30_000)
+    await _goto_with_retry(page, NHK_BLOG_INDEX_URL, timeout=30_000)
     await page.wait_for_timeout(1_500)
 
     posts: list[dict] = await page.evaluate(
@@ -127,7 +141,7 @@ async def fetch_blog_calendar_urls(page: Page) -> list[tuple[str, int]]:
 
 async def scrape_blog_calendar(page: Page, url: str, year: int) -> list[Movie]:
     """Extract NHK BSP4K movies from one monthly blog post."""
-    await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+    await _goto_with_retry(page, url, timeout=30_000)
     await page.wait_for_timeout(1_500)
     body = await page.inner_text("body")
     return _parse_blog_text(body, year)
@@ -196,7 +210,7 @@ def _parse_blog_text(text: str, year: int) -> list[Movie]:
 
 async def scrape_series_schedule(page: Page) -> list[Movie]:
     """Scrape the series /schedule page for BSP4K items (href contains -s5-)."""
-    await page.goto(NHK_SERIES_SCHEDULE_URL, wait_until="domcontentloaded", timeout=25_000)
+    await _goto_with_retry(page, NHK_SERIES_SCHEDULE_URL, timeout=25_000)
     await page.wait_for_timeout(1_500)
 
     items: list[dict] = await page.evaluate(
@@ -297,7 +311,10 @@ async def check_justwatch_jp(title: str) -> dict[str, bool]:
 
 async def main() -> None:
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=HEADLESS)
+        browser = await pw.chromium.launch(
+            headless=HEADLESS,
+            args=["--disable-http2"],
+        )
         ctx = await browser.new_context(
             locale="ja-JP",
             timezone_id="Asia/Tokyo",
