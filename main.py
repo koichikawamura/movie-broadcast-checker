@@ -46,7 +46,8 @@ HEADLESS = True
 # Monthly blog index (all calendar posts for プレミアムシネマ / シネマ4K)
 NHK_BLOG_INDEX_URL = "https://www.nhk.jp/g/ts/K8649395M1/blog/bl/pLAv8dgRAB/"
 
-# Series /schedule page (one week, but exact program names; channel code s5 = BSP4K)
+# Series pages on web.nhk
+NHK_SERIES_BASE_URL     = "https://www.web.nhk/tv/pl/series-tep-K8649395M1/"
 NHK_SERIES_SCHEDULE_URL = "https://www.web.nhk/tv/pl/series-tep-K8649395M1/schedule"
 BSP4K_CHANNEL_CODE = "s5"   # present in href as  …schedule-tep-s5-…
 
@@ -145,46 +146,16 @@ async def scrape_blog_calendar(page: Page, url: str, year: int) -> list[Movie]:
     await _goto_with_retry(page, url, timeout=30_000)
     await page.wait_for_timeout(1_500)
     body = await page.inner_text("body")
-
-    # Collect all anchor links from the post to map movie titles → program pages.
-    anchors: list[dict] = await page.evaluate(
-        """() => [...document.querySelectorAll("a[href]")]
-                .map(a => ({text: a.textContent.trim(), href: a.href}))
-                .filter(a => a.text && a.href.startsWith('http'))"""
-    )
-    link_map: dict[str, str] = {}
-    for a in anchors:
-        t = unicodedata.normalize("NFKC", a["text"]).strip()
-        if t:
-            link_map[t] = a["href"]
-
-    return _parse_blog_text(body, year, link_map=link_map, fallback_url=url)
+    return _parse_blog_text(body, year)
 
 
-def _find_url_for_title(title: str, link_map: dict[str, str]) -> str:
-    """Return the best URL for a movie title from an anchor link map."""
-    if title in link_map:
-        return link_map[title]
-    # Anchor text may include Japanese quotes: 「Title」
-    for text, href in link_map.items():
-        if title in text:
-            return href
-    return ""
-
-
-def _parse_blog_text(
-    text: str,
-    year: int,
-    link_map: dict[str, str] | None = None,
-    fallback_url: str = "",
-) -> list[Movie]:
+def _parse_blog_text(text: str, year: int) -> list[Movie]:
     """Parse the flat text of a monthly calendar blog post.
 
     Entries look like:
         ■「ワンス・アポン・ア・タイム・イン・ハリウッド」
         NHK BSP4K 3月7日(土)午後9:00～
     """
-    link_map = link_map or {}
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     movies: list[Movie] = []
 
@@ -228,13 +199,11 @@ def _parse_blog_text(
         except ValueError:
             continue
 
-        page_url = _find_url_for_title(title, link_map) or fallback_url
         movies.append(Movie(
             broadcast_date=bd.isoformat(),
             broadcast_time=broadcast_time,
             program_name=_infer_program_name(title),
             title=title,
-            page_url=page_url,
         ))
 
     return movies
@@ -256,7 +225,7 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
                 if (!scheduleA) return;
                 // Prefer the episode detail link (/ep/) as the page URL.
                 const epA = [...li.querySelectorAll("a[href]")]
-                    .find(a => /\/ep\//.test(a.href));
+                    .find(a => /[/]ep[/]/.test(a.href));
                 const titleEl = li.querySelector(".program_title");
                 results.push({{
                     text: (titleEl || li).textContent.trim(),
@@ -307,6 +276,29 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
         ))
 
     return movies
+
+# ── Source 3: series episode list ──────────────────────────────────────────────
+
+async def fetch_episode_url_map(page: Page) -> dict[str, str]:
+    """Scrape the series main page for all /ep/ links and return title → URL."""
+    await _goto_with_retry(page, NHK_SERIES_BASE_URL, timeout=30_000)
+    await page.wait_for_timeout(1_500)
+
+    items: list[dict] = await page.evaluate(
+        """() => [...document.querySelectorAll("a[href*='/ep/']")]
+                .map(a => ({text: a.textContent.trim(), href: a.href}))
+                .filter(a => a.text)"""
+    )
+
+    ep_map: dict[str, str] = {}
+    for item in items:
+        text = unicodedata.normalize("NFKC", item["text"]).strip()
+        m = re.search(r"「([^」]+)」", text)
+        title = m.group(1).strip() if m else text
+        if title and title not in ep_map:
+            ep_map[title] = item["href"]
+    return ep_map
+
 
 # ── JustWatch ──────────────────────────────────────────────────────────────────
 
@@ -388,6 +380,11 @@ async def main() -> None:
         schedule_items = await scrape_series_schedule(page)
         print(f"  {len(schedule_items)} BSP4K item(s)")
 
+        # ── 1c. Series episode list (episode-level page URLs) ─────────────────
+        print("\nFetching series episode list …")
+        episode_url_map = await fetch_episode_url_map(page)
+        print(f"  {len(episode_url_map)} episode URL(s)")
+
         await browser.close()
 
     # ── Merge: use (date, title) as key; /schedule overrides blog ────────────
@@ -398,6 +395,11 @@ async def main() -> None:
         merged[(m.broadcast_date, m.title)] = m   # /schedule wins
 
     all_movies = sorted(merged.values(), key=lambda m: (m.broadcast_date, m.broadcast_time))
+
+    # Fill in episode page URLs (prefer already-set /ep/ URLs from the schedule scraper).
+    for m in all_movies:
+        if not m.page_url and m.title in episode_url_map:
+            m.page_url = episode_url_map[m.title]
 
     if not all_movies:
         print(
