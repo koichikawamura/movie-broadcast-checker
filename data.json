@@ -1,5 +1,5 @@
 {
-  "updated": "2026-03-09",
+  "updated": "2026-03-18",
   "services": [
     "Netflix",
     "Amazon Prime Video",
@@ -23,7 +23,7 @@
       "broadcast_time": "21:00",
       "program_name": "プレミアムシネマ4K",
       "title": "ワンス・アポン・ア・タイム・イン・ハリウッド",
-      "page_url": "https://www.web.nhk/tv/pl/series-tep-K8649395M1/ep/P3Y6Y921ZY",
+      "page_url": "",
       "streaming": {
         "Netflix": false,
         "Amazon Prime Video": true,
@@ -45,7 +45,7 @@
       "broadcast_time": "09:30",
       "program_name": "シネマ4K",
       "title": "雨月物語 4Kデジタル修復版",
-      "page_url": "https://www.web.nhk/tv/pl/schedule-tep-s5-130-20260316/ep/EQ3P2MWG9J",
+      "page_url": "",
       "streaming": {
         "Netflix": false,
         "Amazon Prime Video": true,
@@ -89,7 +89,7 @@
       "broadcast_time": "09:30",
       "program_name": "シネマ4K",
       "title": "近松物語 4Kデジタル修復版",
-      "page_url": "",
+      "page_url": "https://www.web.nhk/tv/pl/series-tep-K8649395M1/ep/99N8JK7J23",
       "streaming": {
         "Netflix": false,
         "Amazon Prime Video": true,
@@ -111,7 +111,7 @@
       "broadcast_time": "09:30",
       "program_name": "シネマ4K",
       "title": "浮草 4Kデジタル修復版",
-      "page_url": "",
+      "page_url": "https://www.web.nhk/tv/pl/series-tep-K8649395M1/ep/RYRZJL15MJ",
       "streaming": {
         "Netflix": false,
         "Amazon Prime Video": false,
@@ -133,13 +133,13 @@
       "broadcast_time": "09:30",
       "program_name": "シネマ4K",
       "title": "復活の日 4Kデジタル修復版",
-      "page_url": "",
+      "page_url": "https://www.web.nhk/tv/pl/series-tep-K8649395M1/ep/MP8YVP43GJ",
       "streaming": {
         "Netflix": false,
         "Amazon Prime Video": false,
         "Disney+": false,
         "Hulu": false,
-        "U-NEXT": false,
+        "U-NEXT": true,
         "Apple TV": false,
         "ABEMA": false,
         "WOWOW": false,
@@ -147,7 +147,7 @@
         "dTV": false,
         "HBO Max (U-NEXT+fee)": false,
         "Apple TV (Amazon+fee)": false,
-        "KADOKAWA ch (Amazon+fee)": false
+        "KADOKAWA ch (Amazon+fee)": true
       }
     },
     {

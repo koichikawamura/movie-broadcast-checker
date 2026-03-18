@@ -146,16 +146,81 @@ async def scrape_blog_calendar(page: Page, url: str, year: int) -> list[Movie]:
     await _goto_with_retry(page, url, timeout=30_000)
     await page.wait_for_timeout(1_500)
     body = await page.inner_text("body")
-    return _parse_blog_text(body, year)
+
+    # Walk every node in document order.  Emit a "bsp4k" event for each text node
+    # line that contains the BSP4K label, and a "detail" event for each <a> whose
+    # text contains "詳しく見る".  Then pair consecutive bsp4k→detail events.
+    raw_pairs: list[dict] = await page.evaluate(
+        """() => {
+            const BSP4K   = "NHK BSP4K";
+            const DETAIL  = "詳しく見る";
+            const events  = [];
+
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ALL);
+            let node;
+            while ((node = walker.nextNode())) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    for (const line of node.textContent.split(/\\n/)) {
+                        if (line.includes(BSP4K))
+                            events.push({ type: "bsp4k", text: line.trim() });
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE &&
+                           node.tagName === "A" &&
+                           node.textContent.trim().includes(DETAIL)) {
+                    events.push({ type: "detail", href: node.href });
+                }
+            }
+
+            const pairs = [];
+            let pending = null;
+            for (const ev of events) {
+                if (ev.type === "bsp4k") {
+                    pending = ev.text;          // remember the most-recent BSP4K line
+                } else if (ev.type === "detail" && pending) {
+                    pairs.push({ bsp4kLine: pending, href: ev.href });
+                    pending = null;
+                }
+            }
+            return pairs;
+        }"""
+    )
+
+    # Follow each "詳しく見る" link and resolve to an /ep/ URL.
+    # We have already captured `body` so navigating away is fine.
+    href_map: dict[str, str] = {}
+    for pair in raw_pairs:
+        dest = pair["href"]
+        if "/ep/" in dest:
+            ep_url = dest
+        else:
+            try:
+                await _goto_with_retry(page, dest, timeout=20_000)
+                await page.wait_for_timeout(800)
+                ep_url = await page.evaluate(
+                    """() => {
+                        const a = document.querySelector('a[href*="/ep/"]');
+                        return a ? a.href : (location.href.includes("/ep/") ? location.href : "");
+                    }"""
+                )
+            except Exception as exc:
+                print(f"  [warn] could not follow detail link {dest}: {exc}", file=sys.stderr)
+                ep_url = ""
+
+        if ep_url:
+            key = unicodedata.normalize("NFKC", pair["bsp4kLine"]).strip()
+            href_map[key] = ep_url
+
+    return _parse_blog_text(body, year, href_map)
 
 
-def _parse_blog_text(text: str, year: int) -> list[Movie]:
+def _parse_blog_text(text: str, year: int, href_map: dict[str, str] | None = None) -> list[Movie]:
     """Parse the flat text of a monthly calendar blog post.
 
     Entries look like:
         ■「ワンス・アポン・ア・タイム・イン・ハリウッド」
         NHK BSP4K 3月7日(土)午後9:00～
     """
+    href_map = href_map or {}
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     movies: list[Movie] = []
 
@@ -199,42 +264,54 @@ def _parse_blog_text(text: str, year: int) -> list[Movie]:
         except ValueError:
             continue
 
+        page_url = href_map.get(unicodedata.normalize("NFKC", line).strip(), "")
         movies.append(Movie(
             broadcast_date=bd.isoformat(),
             broadcast_time=broadcast_time,
             program_name=_infer_program_name(title),
             title=title,
+            page_url=page_url,
         ))
 
     return movies
 
 # ── Source 2: series /schedule page ────────────────────────────────────────────
 
-def _ep_link_to_title(raw_text: str) -> str:
-    """Extract a bare movie title from the text content of an /ep/ anchor."""
-    text = unicodedata.normalize("NFKC", raw_text).strip()
-    for prefix in ("シネマ4K", "プレミアムシネマ4K", "プレミアムシネマ", "シネマ"):
-        if text.startswith(prefix):
-            text = text[len(prefix):].strip()
-            break
-    m = re.search(r"「([^」]+)」", text)
-    return m.group(1).strip() if m else text.split("\n")[0].strip()
-
 
 async def _collect_ep_url_map(page: Page) -> dict[str, str]:
-    """Query all /ep/ links on the current page and return title → URL."""
+    """Query all /ep/ links on the current page and return title → URL.
+
+    The /ep/ link itself may be a small button (e.g. "詳細を見る") whose own
+    textContent does not contain the movie title.  We therefore walk up the DOM
+    from each link to find the nearest ancestor element whose text includes a
+    「Title」 pattern.
+    """
     raw: list[dict] = await page.evaluate(
         """() => {
             const seen = new Set();
             return [...document.querySelectorAll('a[href*="/ep/"]')]
-                .filter(a => { if (seen.has(a.href)) return false; seen.add(a.href); return true; })
-                .map(a => ({ text: a.textContent.trim(), href: a.href }))
-                .filter(a => a.text);
+                .filter(a => {
+                    if (seen.has(a.href)) return false;
+                    seen.add(a.href);
+                    return true;
+                })
+                .map(a => {
+                    // Walk up at most 6 ancestor levels to find 「Title」 text.
+                    let el = a;
+                    for (let i = 0; i < 6; i++) {
+                        const m = el.textContent.match(/「([^」]+)」/);
+                        if (m) return { title: m[1].trim(), href: a.href };
+                        if (!el.parentElement) break;
+                        el = el.parentElement;
+                    }
+                    return null;
+                })
+                .filter(Boolean);
         }"""
     )
     ep_map: dict[str, str] = {}
     for item in raw:
-        title = _ep_link_to_title(item["text"])
+        title = unicodedata.normalize("NFKC", item["title"]).strip()
         if title and title not in ep_map:
             ep_map[title] = item["href"]
     return ep_map
@@ -261,9 +338,6 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
         }}""",
         BSP4K_CHANNEL_CODE,
     )
-
-    # Collect /ep/ links from the same page to map titles → episode URLs.
-    ep_url_map = await _collect_ep_url_map(page)
 
     movies: list[Movie] = []
     for item in items:
@@ -294,12 +368,23 @@ async def scrape_series_schedule(page: Page) -> list[Movie]:
             continue
         title = title_m.group(1).strip()
 
+        # Visit the per-broadcast schedule page to get the episode /ep/ URL.
+        ep_url = ""
+        try:
+            await _goto_with_retry(page, href, timeout=20_000)
+            await page.wait_for_timeout(500)
+            ep_url = await page.evaluate(
+                """() => { const a = document.querySelector('a[href*="/ep/"]'); return a ? a.href : ""; }"""
+            )
+        except Exception as exc:
+            print(f"  [warn] could not fetch schedule page {href}: {exc}", file=sys.stderr)
+
         movies.append(Movie(
             broadcast_date=bd.isoformat(),
             broadcast_time=broadcast_time,
             program_name=program_name,
             title=title,
-            page_url=ep_url_map.get(title, ""),
+            page_url=ep_url,
         ))
 
     return movies
